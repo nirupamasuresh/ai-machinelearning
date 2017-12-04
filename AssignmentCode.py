@@ -75,7 +75,6 @@ class KNN:
 		self.test_data, self.training = trainingTestData(encodedData, 33.0/100.0)
 		self.test_data, self.test_labels = getNumpy(self.test_data)
 		self.training, self.training_labels = getNumpy(self.training)
-		print len(self.training) + len(self.test_data)
 		predictions = self.predict(self.test_data, 20)
 		print evaluate(predictions, self.test_labels)
 
@@ -116,8 +115,8 @@ class KNN:
 
 	def predict(self, features, k):
 		predictions = []
-		for i in range(len(self.test_data)):
-			neighbors = self.getNeighbors(self.test_data[i], k)
+		for i in range(len(features)):
+			neighbors = self.getNeighbors(features[i], k)
 			result = self.getLabel(neighbors)
 			predictions.append(result)
 		return predictions
