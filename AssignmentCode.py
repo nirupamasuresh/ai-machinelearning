@@ -75,7 +75,8 @@ class KNN:
 		self.test_data, self.training = trainingTestData(encodedData, 33.0/100.0)
 		self.test_data, self.test_labels = getNumpy(self.test_data)
 		self.training, self.training_labels = getNumpy(self.training)
-		predictions = self.predict(self.test_data,20)
+		print len(self.training) + len(self.test_data)
+		predictions = self.predict(self.test_data, 20)
 		print evaluate(predictions, self.test_labels)
 
 	def euclidean_distance(self, row1, row2):
