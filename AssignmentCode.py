@@ -1,7 +1,5 @@
 import pandas as pd 
 import numpy as np
-import math
-import operator
 #Data with features and target values
 #Tutorial for Pandas is here - https://pandas.pydata.org/pandas-docs/stable/tutorials.html
 #Helper functions are provided so you shouldn't need to learn Pandas
@@ -69,27 +67,25 @@ class KNN:
 	labels = []
 	test_labels = []
 	training_labels = []
+
 	def __init__(self):
 		self.columns = dataset.columns.values
 		self.distance_columns = self.columns[2:]
 		encodedData = encodeData(dataset,self.columns[5:len(self.columns)-1])
-		self.test_data, self.training = trainingTestData(encodedData, 20.0/80.0)
+		self.test_data, self.training = trainingTestData(encodedData, 33.0/100.0)
 		self.test_data, self.test_labels = getNumpy(self.test_data)
 		self.training, self.training_labels = getNumpy(self.training)
-		predictions = self.predict(self.test_data)
+		predictions = self.predict(self.test_data,20)
 		print evaluate(predictions, self.test_labels)
 
-	def euclidean_distance(self, row1, row2, length):
-		dist = 0
-		for x in range(length):
-			dist += pow((row1[x] - row2[x]), 2)
-		return math.sqrt(dist)
+	def euclidean_distance(self, row1, row2):
+		return np.linalg.norm(row2 - row1)
 
 	def getNeighbors(self, testRow, k):
 		distances = []
 		for i in range(len(self.training)):
 			self.training[i][-1] = self.training_labels[i]
-			distances.append((self.training[i], self.euclidean_distance(testRow, self.training[i], len(testRow))))
+			distances.append((self.training[i], self.euclidean_distance(testRow, self.training[i])))
 		distances.sort(key=lambda x:x[1])
 		neighbors = []
 		for i in range(k):
@@ -98,24 +94,29 @@ class KNN:
 
 	def getLabel(self, neighbors):
 		classVotes = {}
+		maxresponse = 0
+		actual_response = 0
 		for x in range(len(neighbors)):
 			response = neighbors[x][-1]
 			if response in classVotes:
 				classVotes[response] += 1
 			else:
 				classVotes[response] = 1
-		sortedVotes = sorted(classVotes.iteritems(), key=operator.itemgetter(1), reverse=True)
-		return sortedVotes[0][0]
+		for key, value in classVotes.iteritems():
+			if value > maxresponse:
+				maxresponse = value
+				actual_response = key
+		return actual_response
 
 	def train(self, features, labels):
 		#training logic here
 		#input is list/array of features and labels
 		return
 
-	def predict(self, features):
+	def predict(self, features, k):
 		predictions = []
 		for i in range(len(self.test_data)):
-			neighbors = self.getNeighbors(self.test_data[i], 15)
+			neighbors = self.getNeighbors(self.test_data[i], k)
 			result = self.getLabel(neighbors)
 			predictions.append(result)
 		return predictions
