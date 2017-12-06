@@ -188,10 +188,10 @@ class MLP:
 
 	def initWeightMatrix(self, numberOfNodes, noOfFeatures):
 		#placing the bias at the beginning for each node in the hidden layer
-		weightMatrix[0] = np.zeros(numberOfNodes)
+		self.weightMatrix = []
+		self.weightMatrix.append(np.zeros(numberOfNodes))
 		for i in range(1,noOfFeatures+1):
-			weightMatrix[i] = np.zeros(numberOfNodes)
-		return weightMatrix
+			self.weightMatrix.append(np.zeros(numberOfNodes))
 
 	def prepareData(self):
 		self.columns = dataset.columns.values
@@ -204,24 +204,16 @@ class MLP:
 		self.weights = np.zeros(self.nodes+1)
 		self.initWeightMatrix(self.nodes, len(self.training[0]))
 
-	def hiddenLayer(self, feature, label):
+	def hiddenLayer(self, feature):
 		transposeMat = np.transpose(self.weightMatrix)
 		predictions = []
 		for i in range(0, self.nodes):
 			prediction = self.predictForOne(feature, transposeMat[i])
-			error = label - prediction
 			predictions.append(prediction)
-			self.weightMatrix[0][i] = self.weightMatrix[0][i] + self.learning_rate * error
-			for j in range(len(feature)-1):
-				self.weightMatrix[j+1][i] = self.weightMatrix[j+1][i] + self.learning_rate * error * feature[j]
 		return predictions
 
-	def outputLayer(self, inputPred, weights, label):
+	def outputLayer(self, inputPred, weights):
 		prediction = self.predictForOne(inputPred, weights)
-		error = label - prediction
-		self.weights[0] = self.weights[0] + self.learning_rate * error
-			for j in range(len(feature)-1):
-				self.weights[j+1] = self.weights[j+1] + self.learning_rate * error * feature[j]
 		return prediction
 
 	def predictForOne(self, feature, weights):
@@ -236,32 +228,44 @@ class MLP:
 	def predict(self, features):
 		predictions = []
 		for feature in features:
-			predictions.append(self.predictForOne(feature))
+			hiddenPred = self.hiddenLayer(feature)
+			predictions.append(self.outputLayer(hiddenPred, self.weights))
 		return predictions
 
 	def __init__(self):
 		self.prepareData()
-		return
+		self.train(self.training, self.training_labels)
+		print evaluate(self.predict(self.test_data), self.test_labels)
 
 	def train(self, features, labels):
 		rms = 1.0
 		error = 0.0
+		l = -1
 		while (l<200 and rms != 0.0):
+			l += 1
 			predictions = []
 			index = 0
 			for feature in features:
-				hiddenLayerPred = self.hiddenLayer(feature, label[index])
-				prediction = self.outputLayer(hiddenLayerPred, self.weights, label[index])
+				#predicting hidden layer outputs
+				hiddenLayerPred = self.hiddenLayer(feature)
+				#updating weight matrix for hidden layer
+				for i in range(0,self.nodes):
+					error = labels[index] - hiddenLayerPred[i]
+					self.weightMatrix[0][i] = self.weightMatrix[0][i] + self.learning_rate * error
+					for j in range(len(feature)-1):
+						self.weightMatrix[j+1][i] = self.weightMatrix[j+1][i] + self.learning_rate * error * feature[j]
+
+				#predicting final output
+				prediction = self.outputLayer(hiddenLayerPred, self.weights)
 				predictions.append(prediction)
+				error = labels[index] - prediction
+				#updating weights for output layer
+				self.weights[0] = self.weights[0] + self.learning_rate * error
+				for j in range(self.nodes-1):
+					self.weights[j+1] = self.weights[j+1] + self.learning_rate * error * feature[j]
 				index +=1
 				#update bias
 			rms = np.sqrt(((predictions - labels) ** 2).mean())
-
-
-	def predict(self, features):
-		#Run model here
-		#Return list/array of predictions where there is one prediction for each set of features
-		return
 
 class ID3:
 	def __init__(self):
@@ -280,4 +284,4 @@ class ID3:
 		return
 
 if __name__ == "__main__":
-	Perceptron()
+	MLP()
