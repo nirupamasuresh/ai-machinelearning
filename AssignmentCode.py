@@ -55,22 +55,19 @@ def getPythonList(dataset):
 def evaluate(solutions, real):
 	predictions = np.array(solutions)
 	labels = np.array(real)
-	return float((predictions == labels).sum()) / labels.size
+	return (predictions == labels).sum() / float(labels.size)
 
 #===========================================================================================================
 
 class KNN:
 	columns = []
-	distance_columns = []
 	training = []
 	test_data = []
-	labels = []
 	test_labels = []
 	training_labels = []
 
 	def __init__(self):
 		self.columns = dataset.columns.values
-		self.distance_columns = self.columns[2:]
 		encodedData = encodeData(dataset,self.columns[5:len(self.columns)-1])
 		self.test_data, self.training = trainingTestData(encodedData, 33.0/100.0)
 		self.test_data, self.test_labels = getNumpy(self.test_data)
@@ -122,20 +119,54 @@ class KNN:
 		return predictions
 
 class Perceptron:
+	columns = []
+	training = []
+	test_data = []
+	test_labels = []
+	training_labels = []
+	weights = []
+
 	def __init__(self):
-		#Perceptron state here
-		#Feel free to add methods
-		return
+		self.columns = dataset.columns.values
+		self.distance_columns = self.columns[2:]
+		normData = normalizeData(dataset, self.columns[2:5])
+		encodedData = encodeData(normData,self.columns[5:len(self.columns)-1])
+		self.test_data, self.training = trainingTestData(encodedData, 33.0/100.0)
+		self.test_data, self.test_labels = getNumpy(self.test_data)
+		self.training, self.training_labels = getNumpy(self.training)
+		self.weights = np.zeros(len(self.training[0]) + 1)
+		self.train(self.training, self.training_labels)
+		predictions = []
+		for test in self.test_data:
+			predictions.append(self.predict(test))
+		print evaluate(predictions, self.test_labels)
 
 	def train(self, features, labels):
-		#training logic here
-		#input is list/array of features and labels
-		return
+		rms = 1.0
+		error = 0.0
+		learning_rate = 0.01
+		for l in range(0,200):
+			predictions = []
+			index = 0
+			for feature in features:
+				prediction = self.predict(feature)
+				predictions.append(prediction)
+				error = labels[index] - prediction
+				index +=1
+				#update bias
+				self.weights[0] = self.weights[0] + learning_rate * error
+				for j in range(len(feature)-1):
+					self.weights[j+1] = self.weights[j+1] + learning_rate * error * feature[j]
+			rms = np.sqrt(((predictions - labels) ** 2).mean())
 
 	def predict(self, features):
-		#Run model here
-		#Return list/array of predictions where there is one prediction for each set of features
-		return
+		sum = self.weights[0]
+		for i in range(len(features)-1):
+			sum += self.weights[i+1] * features[i]
+		activation = 1.0/(1+np.exp(-sum))
+		if activation >= 0.5:
+			return 1
+		return 0
 
 class MLP:
 	def __init__(self):
@@ -170,4 +201,4 @@ class ID3:
 		return
 
 if __name__ == "__main__":
-	KNN()
+	Perceptron()
