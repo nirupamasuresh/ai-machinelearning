@@ -126,7 +126,7 @@ class Perceptron:
 	training_labels = []
 	weights = []
 
-	def __init__(self):
+	def prepareData(self):
 		self.columns = dataset.columns.values
 		self.distance_columns = self.columns[2:]
 		normData = normalizeData(dataset, self.columns[2:5])
@@ -135,21 +135,23 @@ class Perceptron:
 		self.test_data, self.test_labels = getNumpy(self.test_data)
 		self.training, self.training_labels = getNumpy(self.training)
 		self.weights = np.zeros(len(self.training[0]) + 1)
+
+	def __init__(self):
+		self.prepareData()
 		self.train(self.training, self.training_labels)
-		predictions = []
-		for test in self.test_data:
-			predictions.append(self.predict(test))
-		print evaluate(predictions, self.test_labels)
+		print evaluate(self.predict(self.test_data), self.test_labels)
 
 	def train(self, features, labels):
 		rms = 1.0
 		error = 0.0
 		learning_rate = 0.01
-		for l in range(0,200):
+		l = -1
+		while (l<200 and rms != 0.0):
+			l += 1
 			predictions = []
 			index = 0
 			for feature in features:
-				prediction = self.predict(feature)
+				prediction = self.predictForOne(feature)
 				predictions.append(prediction)
 				error = labels[index] - prediction
 				index +=1
@@ -159,14 +161,20 @@ class Perceptron:
 					self.weights[j+1] = self.weights[j+1] + learning_rate * error * feature[j]
 			rms = np.sqrt(((predictions - labels) ** 2).mean())
 
-	def predict(self, features):
+	def predictForOne(self, feature):
 		sum = self.weights[0]
-		for i in range(len(features)-1):
-			sum += self.weights[i+1] * features[i]
+		for i in range(len(feature)-1):
+			sum += self.weights[i+1] * feature[i]
 		activation = 1.0/(1+np.exp(-sum))
 		if activation >= 0.5:
 			return 1
 		return 0
+
+	def predict(self, features):
+		predictions = []
+		for feature in features:
+			predictions.append(self.predictForOne(feature))
+		return predictions
 
 class MLP:
 	def __init__(self):
