@@ -145,9 +145,7 @@ class Perceptron:
 		rms = 1.0
 		error = 0.0
 		learning_rate = 0.01
-		l = -1
 		while (l<200 and rms != 0.0):
-			l += 1
 			predictions = []
 			index = 0
 			for feature in features:
@@ -177,15 +175,88 @@ class Perceptron:
 		return predictions
 
 class MLP:
+	columns = []
+	training = []
+	test_data = []
+	test_labels = []
+	training_labels = []
+	weightMatrix = []
+	transposeMat = []
+	weights = []
+	nodes = 5
+	learning_rate = 0.01
+
+	def initWeightMatrix(self, numberOfNodes, noOfFeatures):
+		#placing the bias at the beginning for each node in the hidden layer
+		weightMatrix[0] = np.zeros(numberOfNodes)
+		for i in range(1,noOfFeatures+1):
+			weightMatrix[i] = np.zeros(numberOfNodes)
+		return weightMatrix
+
+	def prepareData(self):
+		self.columns = dataset.columns.values
+		self.distance_columns = self.columns[2:]
+		normData = normalizeData(dataset, self.columns[2:5])
+		encodedData = encodeData(normData,self.columns[5:len(self.columns)-1])
+		self.test_data, self.training = trainingTestData(encodedData, 33.0/100.0)
+		self.test_data, self.test_labels = getNumpy(self.test_data)
+		self.training, self.training_labels = getNumpy(self.training)
+		self.weights = np.zeros(self.nodes+1)
+		self.initWeightMatrix(self.nodes, len(self.training[0]))
+
+	def hiddenLayer(self, feature, label):
+		transposeMat = np.transpose(self.weightMatrix)
+		predictions = []
+		for i in range(0, self.nodes):
+			prediction = self.predictForOne(feature, transposeMat[i])
+			error = label - prediction
+			predictions.append(prediction)
+			self.weightMatrix[0][i] = self.weightMatrix[0][i] + self.learning_rate * error
+			for j in range(len(feature)-1):
+				self.weightMatrix[j+1][i] = self.weightMatrix[j+1][i] + self.learning_rate * error * feature[j]
+		return predictions
+
+	def outputLayer(self, inputPred, weights, label):
+		prediction = self.predictForOne(inputPred, weights)
+		error = label - prediction
+		self.weights[0] = self.weights[0] + self.learning_rate * error
+			for j in range(len(feature)-1):
+				self.weights[j+1] = self.weights[j+1] + self.learning_rate * error * feature[j]
+		return prediction
+
+	def predictForOne(self, feature, weights):
+		sum = weights[0]
+		for i in range(len(feature)-1):
+			sum += weights[i+1] * feature[i]
+		activation = 1.0/(1+np.exp(-sum))
+		if activation >= 0.5:
+			return 1
+		return 0
+
+	def predict(self, features):
+		predictions = []
+		for feature in features:
+			predictions.append(self.predictForOne(feature))
+		return predictions
+
 	def __init__(self):
-		#Multilayer perceptron state here
-		#Feel free to add methods
+		self.prepareData()
 		return
 
 	def train(self, features, labels):
-		#training logic here
-		#input is list/array of features and labels
-		return
+		rms = 1.0
+		error = 0.0
+		while (l<200 and rms != 0.0):
+			predictions = []
+			index = 0
+			for feature in features:
+				hiddenLayerPred = self.hiddenLayer(feature, label[index])
+				prediction = self.outputLayer(hiddenLayerPred, self.weights, label[index])
+				predictions.append(prediction)
+				index +=1
+				#update bias
+			rms = np.sqrt(((predictions - labels) ** 2).mean())
+
 
 	def predict(self, features):
 		#Run model here
