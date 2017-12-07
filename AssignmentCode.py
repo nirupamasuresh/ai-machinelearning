@@ -69,7 +69,7 @@ class KNN:
 	def __init__(self):
 		self.columns = dataset.columns.values
 		encodedData = encodeData(dataset,self.columns[5:len(self.columns)-1])
-		self.test_data, self.training = trainingTestData(encodedData, 33.0/100.0)
+		self.test_data, self.training = trainingTestData(encodedData, 5.0/100.0)
 		self.test_data, self.test_labels = getNumpy(self.test_data)
 		self.training, self.training_labels = getNumpy(self.training)
 		predictions = self.predict(self.test_data, 20)
@@ -145,7 +145,9 @@ class Perceptron:
 		rms = 1.0
 		error = 0.0
 		learning_rate = 0.01
-		while (l<200 and rms != 0.0):
+		l = -1
+		while (l<300 and rms != 0.0):
+			l+=1
 			predictions = []
 			index = 0
 			for feature in features:
@@ -160,11 +162,10 @@ class Perceptron:
 			rms = np.sqrt(((predictions - labels) ** 2).mean())
 
 	def predictForOne(self, feature):
-		sum = self.weights[0]
+		activation = self.weights[0]
 		for i in range(len(feature)-1):
-			sum += self.weights[i+1] * feature[i]
-		activation = 1.0/(1+np.exp(-sum))
-		if activation >= 0.5:
+			activation += self.weights[i+1] * feature[i]
+		if activation >= 0.0:
 			return 1
 		return 0
 
@@ -189,9 +190,9 @@ class MLP:
 	def initWeightMatrix(self, numberOfNodes, noOfFeatures):
 		#placing the bias at the beginning for each node in the hidden layer
 		self.weightMatrix = []
-		self.weightMatrix.append(np.zeros(numberOfNodes))
+		self.weightMatrix.append(np.random.uniform(low=-0.5, high=0.5, size=numberOfNodes))
 		for i in range(1,noOfFeatures+1):
-			self.weightMatrix.append(np.zeros(numberOfNodes))
+			self.weightMatrix.append(np.random.uniform(low=-0.5, high=0.5, size=numberOfNodes))
 
 	def prepareData(self):
 		self.columns = dataset.columns.values
@@ -201,35 +202,43 @@ class MLP:
 		self.test_data, self.training = trainingTestData(encodedData, 33.0/100.0)
 		self.test_data, self.test_labels = getNumpy(self.test_data)
 		self.training, self.training_labels = getNumpy(self.training)
-		self.weights = np.zeros(self.nodes+1)
+		self.weights = np.random.uniform(low=-0.5, high=0.5, size=self.nodes+1)
 		self.initWeightMatrix(self.nodes, len(self.training[0]))
 
-	def hiddenLayer(self, feature):
+	def hiddenLayerSums(self, feature):
 		transposeMat = np.transpose(self.weightMatrix)
-		predictions = []
+		sums = []
 		for i in range(0, self.nodes):
-			prediction = self.predictForOne(feature, transposeMat[i])
-			predictions.append(prediction)
-		return predictions
+			sums.append(self.sum(feature, transposeMat[i]))
+		return sums
 
 	def outputLayer(self, inputPred, weights):
-		prediction = self.predictForOne(inputPred, weights)
+		sums = self.sum(inputPred, weights)
 		return prediction
 
-	def predictForOne(self, feature, weights):
-		sum = weights[0]
+	def sum(self, feature, weights):
+		g = weights[0]
 		for i in range(len(feature)-1):
-			sum += weights[i+1] * feature[i]
-		activation = 1.0/(1+np.exp(-sum))
-		if activation >= 0.5:
-			return 1
-		return 0
+			g += weights[i+1] * feature[i]
+		return g
+
+	def activation(self, g):
+		return (1.0/(1+np.exp(-g)))
+
+	def partialDerivative(self, g):
+		# act = (1.0/(1+np.exp(-g))) * (1-(1.0/(1+np.exp(-g))))
+		return (1.0/(1+np.exp(-g))) * (1-(1.0/(1+np.exp(-g))))
 
 	def predict(self, features):
 		predictions = []
 		for feature in features:
-			hiddenPred = self.hiddenLayer(feature)
-			predictions.append(self.outputLayer(hiddenPred, self.weights))
+			hiddenLayerSums = self.hiddenLayerSums(feature)
+			hiddenActivations = []
+			for h in range(0,self.nodes):
+				hiddenActivations.append(self.activation(hiddenLayerSums[h]))
+			ouputSum = self.sum(hiddenActivations, self.weights)
+			outputActivation = self.activation(ouputSum)
+			predictions.append(outputActivation)
 		return predictions
 
 	def __init__(self):
@@ -239,33 +248,38 @@ class MLP:
 
 	def train(self, features, labels):
 		rms = 1.0
-		error = 0.0
 		l = -1
-		while (l<200 and rms != 0.0):
+		while (l<100 and rms != 0.0):
 			l += 1
 			predictions = []
 			index = 0
 			for feature in features:
-				#predicting hidden layer outputs
-				hiddenLayerPred = self.hiddenLayer(feature)
+				#calculating sums and activation
+				hiddenLayerSums = self.hiddenLayerSums(feature)
+				hiddenActivations = []
+				for h in range(0,self.nodes):
+					hiddenActivations.append(self.activation(hiddenLayerSums[h]))
+				ouputSum = self.sum(hiddenActivations, self.weights)
+				outputActivation = self.activation(ouputSum)
+
+				delta = self.partialDerivative(ouputSum) * (labels[index] - outputActivation)
+				hiddenDelta = []
+				#backpropagation for the hidden layer
+				for i in range(0, self.nodes):
+					d = self.partialDerivative(hiddenLayerSums[i]) * self.weights[i] * delta
+					hiddenDelta.append(d)
+
 				#updating weight matrix for hidden layer
 				for i in range(0,self.nodes):
-					error = labels[index] - hiddenLayerPred[i]
-					self.weightMatrix[0][i] = self.weightMatrix[0][i] + self.learning_rate * error
+					self.weightMatrix[0][i] = self.weightMatrix[0][i] + self.learning_rate * hiddenDelta[i]
 					for j in range(len(feature)-1):
-						self.weightMatrix[j+1][i] = self.weightMatrix[j+1][i] + self.learning_rate * error * feature[j]
+						self.weightMatrix[j+1][i] = self.weightMatrix[j+1][i] + self.learning_rate * hiddenDelta[i] * feature[j]
 
-				#predicting final output
-				prediction = self.outputLayer(hiddenLayerPred, self.weights)
-				predictions.append(prediction)
-				error = labels[index] - prediction
 				#updating weights for output layer
-				self.weights[0] = self.weights[0] + self.learning_rate * error
+				self.weights[0] = self.weights[0] + self.learning_rate * delta
 				for j in range(self.nodes-1):
-					self.weights[j+1] = self.weights[j+1] + self.learning_rate * error * feature[j]
+					self.weights[j+1] = self.weights[j+1] + self.learning_rate * delta * hiddenActivations[j]
 				index +=1
-				#update bias
-			rms = np.sqrt(((predictions - labels) ** 2).mean())
 
 class ID3:
 	def __init__(self):
@@ -284,4 +298,6 @@ class ID3:
 		return
 
 if __name__ == "__main__":
-	MLP()
+	# print "KNN" , KNN()
+	# print "Perceptron", Perceptron()
+	print "MLP", MLP()
