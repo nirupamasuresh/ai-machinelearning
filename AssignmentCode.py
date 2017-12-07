@@ -227,7 +227,7 @@ class MLP:
 
 	def partialDerivative(self, g):
 		# act = (1.0/(1+np.exp(-g))) * (1-(1.0/(1+np.exp(-g))))
-		return (1.0/(1+np.exp(-g))) * (1-(1.0/(1+np.exp(-g))))
+		return g * (1-g)
 
 	def predict(self, features):
 		predictions = []
@@ -238,7 +238,10 @@ class MLP:
 				hiddenActivations.append(self.activation(hiddenLayerSums[h]))
 			ouputSum = self.sum(hiddenActivations, self.weights)
 			outputActivation = self.activation(ouputSum)
-			predictions.append(outputActivation)
+			if outputActivation >= 0.5:
+				predictions.append(1)
+			else:
+				predictions.append(0)
 		return predictions
 
 	def __init__(self):
@@ -262,11 +265,11 @@ class MLP:
 				ouputSum = self.sum(hiddenActivations, self.weights)
 				outputActivation = self.activation(ouputSum)
 
-				delta = self.partialDerivative(ouputSum) * (labels[index] - outputActivation)
+				delta = self.partialDerivative(outputActivation) * (labels[index] - outputActivation)
 				hiddenDelta = []
 				#backpropagation for the hidden layer
 				for i in range(0, self.nodes):
-					d = self.partialDerivative(hiddenLayerSums[i]) * self.weights[i] * delta
+					d = self.partialDerivative(hiddenActivations[i]) * self.weights[i] * delta
 					hiddenDelta.append(d)
 
 				#updating weight matrix for hidden layer
