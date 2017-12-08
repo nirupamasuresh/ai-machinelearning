@@ -287,7 +287,7 @@ class MLP:
 class ID3:
 	columns = []
 	attributeData = {}
-	tree = {}
+	buckets = [0.2,0.4,0.6,0.8,1.0]
 	def prepareData(self):
 		self.columns = dataset.columns.values
 		self.distance_columns = self.columns[2:]
@@ -295,6 +295,11 @@ class ID3:
 		self.test_data, self.training = trainingTestData(normalizeData, 33.0/100.0)
 		self.test_data, self.test_labels = getNumpy(self.test_data)
 		self.training, self.training_labels = getNumpy(self.training)
+		self.attributeData['net_ope_exp'] = buckets
+		self.attributeData['net_con'] = buckets
+		self.attributeData['tot_loa'] = buckets
+		self.attributeData['can_off'] = ['H','P','S']
+		self.attributeData['can_inc_cha_ope_sea'] = ['INCUMBENT', 'CHALLENGER', 'OPEN']
 
 	def entropy(self, trueValues, total):
 		entropy = -(trueValues/total) * np.log2(trueValues/total) - ((total-trueValues)/total) * np.log2((total-trueValues)/total)
@@ -312,6 +317,12 @@ class ID3:
 			if examples[i][index] in valueDict.keys():
 				positive,total = valueDict[examples[i][index]]
 				valueDict[examples[i][index]] = (positive + labels[i], total+1)
+			elif attribute in self.columns[2:5]:
+				for b in buckets:
+					if examples[i][index] <= b:
+						positive,total = valueDict[b]
+						valueDict[b] = (positive + labels[i], total+1)
+						break
 		totalEx = len(examples)
 		informationGain = presentEntropy
 		for value in attributeValues.keys():
@@ -330,9 +341,15 @@ class ID3:
 		newLabels = []
 		index = self.columns.indexOf(attribute)
 		for i in range(0,len(examples)):
-			if example[index] == attributeValue:
+			if examples[i][index] == attributeValue:
 				newExamples.append(examples[i])
 				newLabels.append(labels[i])
+			elif attribute in self.columns[2:5]:
+				for b in buckets:
+					if examples[i][index] <= b:
+						newExamples.append(examples[i])
+						newLabels.append(labels[i])
+						break
 		return newExamples, newLabels
 
 	def decisionTree(self, examples, attributes, parent_examples, labels, parent_labels):
