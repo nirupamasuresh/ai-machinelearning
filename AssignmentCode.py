@@ -69,7 +69,7 @@ class KNN:
 	def __init__(self):
 		self.columns = dataset.columns.values
 		encodedData = encodeData(dataset,self.columns[5:len(self.columns)-1])
-		self.test_data, self.training = trainingTestData(encodedData, 5.0/100.0)
+		self.test_data, self.training = trainingTestData(encodedData, 1.0/100.0)
 		self.test_data, self.test_labels = getNumpy(self.test_data)
 		self.training, self.training_labels = getNumpy(self.training)
 		predictions = self.predict(self.test_data, 20)
@@ -131,7 +131,7 @@ class Perceptron:
 		self.distance_columns = self.columns[2:]
 		normData = normalizeData(dataset, self.columns[2:5])
 		encodedData = encodeData(normData,self.columns[5:len(self.columns)-1])
-		self.test_data, self.training = trainingTestData(encodedData, 33.0/100.0)
+		self.test_data, self.training = trainingTestData(encodedData, 1.0/100.0)
 		self.test_data, self.test_labels = getNumpy(self.test_data)
 		self.training, self.training_labels = getNumpy(self.training)
 		self.weights = np.zeros(len(self.training[0]) + 1)
@@ -199,7 +199,7 @@ class MLP:
 		self.distance_columns = self.columns[2:]
 		normData = normalizeData(dataset, self.columns[2:5])
 		encodedData = encodeData(normData,self.columns[5:len(self.columns)-1])
-		self.test_data, self.training = trainingTestData(encodedData, 33.0/100.0)
+		self.test_data, self.training = trainingTestData(encodedData, 1.0/100.0)
 		self.test_data, self.test_labels = getNumpy(self.test_data)
 		self.training, self.training_labels = getNumpy(self.training)
 		self.weights = np.random.uniform(low=-0.5, high=0.5, size=self.nodes+1)
@@ -252,7 +252,7 @@ class MLP:
 	def train(self, features, labels):
 		rms = 1.0
 		l = -1
-		while (l<100 and rms != 0.0):
+		while (l<50 and rms != 0.0):
 			l += 1
 			predictions = []
 			index = 0
@@ -285,6 +285,79 @@ class MLP:
 				index +=1
 
 class ID3:
+	columns = []
+	attributeData = {}
+	tree = {}
+	def prepareData(self):
+		self.columns = dataset.columns.values
+		self.distance_columns = self.columns[2:]
+		normData = normalizeData(dataset, self.columns[2:5])
+		self.test_data, self.training = trainingTestData(normalizeData, 33.0/100.0)
+		self.test_data, self.test_labels = getNumpy(self.test_data)
+		self.training, self.training_labels = getNumpy(self.training)
+
+	def entropy(self, trueValues, total):
+		entropy = -(trueValues/total) * np.log2(trueValues/total) - ((total-trueValues)/total) * np.log2((total-trueValues)/total)
+		return entropy
+
+	def informationGain(self, attribute, examples, labels, presentEntropy):
+		gain = 0.0
+		selectedAttribute = None
+		attributeValues = self.attributeData[attribute]
+		valueDict = {}
+		index = self.columns.indexOf(attribute)
+		for value in attributeValues.keys():
+			valueDict[value] = (0,0)
+		for i in range(0, len(examples)):
+			if examples[i][index] in valueDict.keys():
+				positive,total = valueDict[examples[i][index]]
+				valueDict[examples[i][index]] = (positive + labels[i], total+1)
+		totalEx = len(examples)
+		informationGain = presentEntropy
+		for value in attributeValues.keys():
+			p,t = valueDict[value]
+			informationGain -= (t/totalEx) * self.entropy(p,t)
+		return informationGain
+
+	def mostCommonLabel(self, labels):
+		sum = np.sum(labels)
+		if sum > (len(labels) - sum):
+			return 1
+		return 0
+
+	def filterExamples(self, examples, attribute, attributeValue, labels):
+		newExamples = []
+		newLabels = []
+		index = self.columns.indexOf(attribute)
+		for i in range(0,len(examples)):
+			if example[index] == attributeValue:
+				newExamples.append(examples[i])
+				newLabels.append(labels[i])
+		return newExamples, newLabels
+
+	def decisionTree(self, examples, attributes, parent_examples, labels, parent_labels):
+		if len(examples) == 0:
+			return self.mostCommonLabel(parent_labels)
+		elif self.entropy(np.sum(labels), len(labels)) == 0:
+			return labels[0]
+		elif len(attributes) == 0:
+			return self.mostCommonLabel(labels)
+		else:
+			infoGain = 0.0
+			pickedAttribute = attributes[0]
+			for attribute in attributes:
+				gain = self.informationGain(attribute, examples, labels, self.entropy(np.sum(labels), len(labels)))
+				if gain > infoGain:
+					infoGain = gain
+					pickedAttribute = attribute
+			tree = {pickedAttribute:{}}
+			for value in attributeData[pickedAttribute]:
+				subExamples, subLabels = self.filterExamples(examples, pickedAttribute, attributeValue, labels)
+				attributes.pop(pickedAttribute)
+				subtree = self.decisionTree(subExamples, attributes, examples, subLabels, parent_labels)
+				tree[pickedAttribute][value] = subtree
+		return tree
+
 	def __init__(self):
 		#Decision tree state here
 		#Feel free to add methods
@@ -301,6 +374,6 @@ class ID3:
 		return
 
 if __name__ == "__main__":
-	# print "KNN" , KNN()
-	# print "Perceptron", Perceptron()
+	print "KNN" , KNN()
+	print "Perceptron", Perceptron()
 	print "MLP", MLP()
