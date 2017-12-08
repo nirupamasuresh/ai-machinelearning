@@ -292,7 +292,7 @@ class ID3:
 		self.columns = dataset.columns.values
 		self.distance_columns = self.columns[2:]
 		normData = normalizeData(dataset, self.columns[2:5])
-		self.test_data, self.training = trainingTestData(normData, 33.0/100.0)
+		self.test_data, self.training = trainingTestData(normData, 10.0/1500.0)
 		self.test_data, self.test_labels = getNumpy(self.test_data)
 		self.training, self.training_labels = getNumpy(self.training)
 		self.attributeData['net_ope_exp'] = self.buckets
@@ -301,7 +301,7 @@ class ID3:
 		self.attributeData['can_off'] = ['H','P','S']
 		self.attributeData['can_inc_cha_ope_sea'] = ['INCUMBENT', 'CHALLENGER', 'OPEN']
 		self.columns = self.columns[2:-1].tolist()
-		print self.decisionTree(self.test_data, self.attributeData.keys(), [], self.test_labels, [])
+		print evaluate(self.predict(self.test_data), self.test_labels)
 
 	def entropy(self, trueValues, total):
 		entropy = -(trueValues/total) * np.log2(trueValues/total) - ((total-trueValues)/total) * np.log2((total-trueValues)/total)
@@ -389,10 +389,27 @@ class ID3:
 		#input is list/array of features and labels
 		return
 
+	def traversal(self, feature, tree):
+		if type(tree) is int:
+			return tree
+		for key in tree.keys():
+			if key in self.columns:
+				val = feature[self.columns.index(key)]
+				if val in tree[key].keys():
+					return self.traversal(feature, tree[key][val])
+				else:
+					for b in self.buckets:
+						if val <= b:
+							return self.traversal(feature, tree[key][b])
+
+
 	def predict(self, features):
-		#Run model here
-		#Return list/array of predictions where there is one prediction for each set of features
-		return
+		predictions = []
+		tree = self.decisionTree(self.test_data, self.attributeData.keys(), [], self.test_labels, [])
+		print len(features)
+		for feature in features:
+			predictions.append(self.traversal(feature, tree))
+		return predictions
 
 if __name__ == "__main__":
 	# print "KNN" , KNN()
