@@ -292,14 +292,16 @@ class ID3:
 		self.columns = dataset.columns.values
 		self.distance_columns = self.columns[2:]
 		normData = normalizeData(dataset, self.columns[2:5])
-		self.test_data, self.training = trainingTestData(normalizeData, 33.0/100.0)
+		self.test_data, self.training = trainingTestData(normData, 33.0/100.0)
 		self.test_data, self.test_labels = getNumpy(self.test_data)
 		self.training, self.training_labels = getNumpy(self.training)
-		self.attributeData['net_ope_exp'] = buckets
-		self.attributeData['net_con'] = buckets
-		self.attributeData['tot_loa'] = buckets
+		self.attributeData['net_ope_exp'] = self.buckets
+		self.attributeData['net_con'] = self.buckets
+		self.attributeData['tot_loa'] = self.buckets
 		self.attributeData['can_off'] = ['H','P','S']
 		self.attributeData['can_inc_cha_ope_sea'] = ['INCUMBENT', 'CHALLENGER', 'OPEN']
+		self.columns = self.columns[2:-1].tolist()
+		print self.decisionTree(self.test_data, self.attributeData.keys(), [], self.test_labels, [])
 
 	def entropy(self, trueValues, total):
 		entropy = -(trueValues/total) * np.log2(trueValues/total) - ((total-trueValues)/total) * np.log2((total-trueValues)/total)
@@ -310,24 +312,26 @@ class ID3:
 		selectedAttribute = None
 		attributeValues = self.attributeData[attribute]
 		valueDict = {}
-		index = self.columns.indexOf(attribute)
-		for value in attributeValues.keys():
+		index = self.columns.index(attribute)
+		for value in attributeValues:
 			valueDict[value] = (0,0)
 		for i in range(0, len(examples)):
 			if examples[i][index] in valueDict.keys():
 				positive,total = valueDict[examples[i][index]]
 				valueDict[examples[i][index]] = (positive + labels[i], total+1)
-			elif attribute in self.columns[2:5]:
-				for b in buckets:
+			else:
+				for b in self.buckets:
 					if examples[i][index] <= b:
 						positive,total = valueDict[b]
 						valueDict[b] = (positive + labels[i], total+1)
 						break
 		totalEx = len(examples)
 		informationGain = presentEntropy
-		for value in attributeValues.keys():
+
+		for value in attributeValues:
 			p,t = valueDict[value]
-			informationGain -= (t/totalEx) * self.entropy(p,t)
+			if t > 0:
+				informationGain -= (t/totalEx) * self.entropy(p,t)
 		return informationGain
 
 	def mostCommonLabel(self, labels):
@@ -339,13 +343,13 @@ class ID3:
 	def filterExamples(self, examples, attribute, attributeValue, labels):
 		newExamples = []
 		newLabels = []
-		index = self.columns.indexOf(attribute)
+		index = self.columns.index(attribute)
 		for i in range(0,len(examples)):
 			if examples[i][index] == attributeValue:
 				newExamples.append(examples[i])
 				newLabels.append(labels[i])
-			elif attribute in self.columns[2:5]:
-				for b in buckets:
+			else:
+				for b in self.buckets:
 					if examples[i][index] <= b:
 						newExamples.append(examples[i])
 						newLabels.append(labels[i])
@@ -368,9 +372,9 @@ class ID3:
 					infoGain = gain
 					pickedAttribute = attribute
 			tree = {pickedAttribute:{}}
-			for value in attributeData[pickedAttribute]:
-				subExamples, subLabels = self.filterExamples(examples, pickedAttribute, attributeValue, labels)
-				attributes.pop(pickedAttribute)
+			attributes.remove(pickedAttribute)
+			for value in self.attributeData[pickedAttribute]:
+				subExamples, subLabels = self.filterExamples(examples, pickedAttribute, value, labels)
 				subtree = self.decisionTree(subExamples, attributes, examples, subLabels, parent_labels)
 				tree[pickedAttribute][value] = subtree
 		return tree
@@ -391,6 +395,7 @@ class ID3:
 		return
 
 if __name__ == "__main__":
-	print "KNN" , KNN()
-	print "Perceptron", Perceptron()
-	print "MLP", MLP()
+	# print "KNN" , KNN()
+	# print "Perceptron", Perceptron()
+	# print "MLP", MLP()
+	ID3().prepareData()
