@@ -1,5 +1,6 @@
 import pandas as pd 
 import numpy as np
+import math
 #Data with features and target values
 #Tutorial for Pandas is here - https://pandas.pydata.org/pandas-docs/stable/tutorials.html
 #Helper functions are provided so you shouldn't need to learn Pandas
@@ -58,11 +59,20 @@ def evaluate(solutions, real):
 	return (predictions == labels).sum() / float(labels.size)
 
 #===========================================================================================================
-def preprocessKNN(dataset):
+def preprocess(dataset):
 	columns = dataset.columns.values
 	encodedData = encodeData(dataset, columns[5:-1])
 	normdata = normalizeData(encodedData, columns[2:5])
 	return getNumpy(normdata)
+
+def preprocessID3(dataset):
+	columns = dataset.columns.values
+	normdata = normalizeData(dataset, columns[2:5])
+	examples, labels = getNumpy(normdata)
+	columns = columns.tolist()
+	for a in ["can_id", "can_nam","winner"]:
+		columns.remove(a)
+	return pd.DataFrame(examples, index=None, columns=columns), labels
 
 class KNN:
 	training = []
@@ -116,31 +126,13 @@ class KNN:
 		return predictions
 
 class Perceptron:
-	columns = []
-	training = []
-	test_data = []
-	test_labels = []
-	training_labels = []
 	weights = []
-
-	def prepareData(self):
-		self.columns = dataset.columns.values
-		self.distance_columns = self.columns[2:]
-		normData = normalizeData(dataset, self.columns[2:5])
-		encodedData = encodeData(normData,self.columns[5:len(self.columns)-1])
-		self.test_data, self.training = trainingTestData(encodedData, 1.0/100.0)
-		self.test_data, self.test_labels = getNumpy(self.test_data)
-		self.training, self.training_labels = getNumpy(self.training)
-		self.weights = np.zeros(len(self.training[0]) + 1)
-
 	def __init__(self):
-		self.prepareData()
-		self.train(self.training, self.training_labels)
-		print evaluate(self.predict(self.test_data), self.test_labels)
+		return
 
 	def train(self, features, labels):
+		self.weights = np.random.uniform(-0.1,0.1,len(features[0]) + 1)
 		rms = 1.0
-		error = 0.0
 		learning_rate = 0.01
 		l = -1
 		while (l<300 and rms != 0.0):
@@ -154,13 +146,13 @@ class Perceptron:
 				index +=1
 				#update bias
 				self.weights[0] = self.weights[0] + learning_rate * error
-				for j in range(len(feature)-1):
+				for j in range(0, len(feature)):
 					self.weights[j+1] = self.weights[j+1] + learning_rate * error * feature[j]
 			rms = np.sqrt(((predictions - labels) ** 2).mean())
 
 	def predictForOne(self, feature):
 		activation = self.weights[0]
-		for i in range(len(feature)-1):
+		for i in range(0, len(feature)):
 			activation += self.weights[i+1] * feature[i]
 		if activation >= 0.0:
 			return 1
@@ -173,95 +165,59 @@ class Perceptron:
 		return predictions
 
 class MLP:
-	columns = []
-	training = []
-	test_data = []
-	test_labels = []
-	training_labels = []
-	weightMatrix = []
-	transposeMat = []
-	weights = []
 	nodes = 5
-	learning_rate = 0.01
+	weights = []
+	weightMatrix = []
 
-	def initWeightMatrix(self, numberOfNodes, noOfFeatures):
-		#placing the bias at the beginning for each node in the hidden layer
-		self.weightMatrix = []
-		self.weightMatrix.append(np.random.uniform(low=-0.5, high=0.5, size=numberOfNodes))
-		for i in range(1,noOfFeatures+1):
-			self.weightMatrix.append(np.random.uniform(low=-0.5, high=0.5, size=numberOfNodes))
-
-	def prepareData(self):
-		self.columns = dataset.columns.values
-		self.distance_columns = self.columns[2:]
-		normData = normalizeData(dataset, self.columns[2:5])
-		encodedData = encodeData(normData,self.columns[5:len(self.columns)-1])
-		self.test_data, self.training = trainingTestData(encodedData, 1.0/100.0)
-		self.test_data, self.test_labels = getNumpy(self.test_data)
-		self.training, self.training_labels = getNumpy(self.training)
-		self.weights = np.random.uniform(low=-0.5, high=0.5, size=self.nodes+1)
-		self.initWeightMatrix(self.nodes, len(self.training[0]))
-
-	def hiddenLayerSums(self, feature):
-		transposeMat = np.transpose(self.weightMatrix)
-		sums = []
-		for i in range(0, self.nodes):
-			sums.append(self.sum(feature, transposeMat[i]))
-		return sums
-
-	def outputLayer(self, inputPred, weights):
-		sums = self.sum(inputPred, weights)
-		return prediction
-
-	def sum(self, feature, weights):
-		g = weights[0]
-		for i in range(len(feature)-1):
-			g += weights[i+1] * feature[i]
-		return g
+	def __init__(self):
+		return
 
 	def activation(self, g):
 		return (1.0/(1+np.exp(-g)))
 
 	def partialDerivative(self, g):
-		# act = (1.0/(1+np.exp(-g))) * (1-(1.0/(1+np.exp(-g))))
 		return g * (1-g)
 
 	def predict(self, features):
 		predictions = []
 		for feature in features:
-			hiddenLayerSums = self.hiddenLayerSums(feature)
-			hiddenActivations = []
-			for h in range(0,self.nodes):
-				hiddenActivations.append(self.activation(hiddenLayerSums[h]))
-			ouputSum = self.sum(hiddenActivations, self.weights)
-			outputActivation = self.activation(ouputSum)
+			hiddenActivations, outputActivation = self.computeActivations(feature)
 			if outputActivation >= 0.5:
 				predictions.append(1)
 			else:
 				predictions.append(0)
 		return predictions
 
-	def __init__(self):
-		self.prepareData()
-		self.train(self.training, self.training_labels)
-		print evaluate(self.predict(self.test_data), self.test_labels)
+	def computeActivations(self, feature):
+		# adding for bias component
+		biasFeature = []
+		biasFeature.append(1)
+		biasFeature.extend(feature)
+		# calculating sums and activation
+		hiddenLayerSums = np.dot(biasFeature, self.weightMatrix)
+		hiddenActivations = []
+		for h in range(0, self.nodes):
+			hiddenActivations.append(self.activation(hiddenLayerSums[h]))
+		# adding bias component
+		biasHiddenAct = []
+		biasHiddenAct.append(1)
+		biasHiddenAct.extend(hiddenActivations)
+		ouputSum = np.dot(biasHiddenAct, self.weights)
+		outputActivation = self.activation(ouputSum)
+		return hiddenActivations, outputActivation
 
 	def train(self, features, labels):
 		rms = 1.0
 		l = -1
+		learning_rate = 0.01
+		self.weights = np.random.uniform(low=-0.1, high=0.1, size=self.nodes+1)
+		self.weightMatrix = np.random.uniform(-0.1,0.1,(len(features[0])+1, self.nodes))
 		while (l<50 and rms != 0.0):
 			l += 1
 			predictions = []
 			index = 0
 			for feature in features:
-				#calculating sums and activation
-				hiddenLayerSums = self.hiddenLayerSums(feature)
-				hiddenActivations = []
-				for h in range(0,self.nodes):
-					hiddenActivations.append(self.activation(hiddenLayerSums[h]))
-				ouputSum = self.sum(hiddenActivations, self.weights)
-				outputActivation = self.activation(ouputSum)
-
+				hiddenActivations, outputActivation = self.computeActivations(feature)
 				delta = self.partialDerivative(outputActivation) * (labels[index] - outputActivation)
 				hiddenDelta = []
 				#backpropagation for the hidden layer
@@ -271,37 +227,40 @@ class MLP:
 
 				#updating weight matrix for hidden layer
 				for i in range(0,self.nodes):
-					self.weightMatrix[0][i] = self.weightMatrix[0][i] + self.learning_rate * hiddenDelta[i]
-					for j in range(len(feature)-1):
-						self.weightMatrix[j+1][i] = self.weightMatrix[j+1][i] + self.learning_rate * hiddenDelta[i] * feature[j]
+					self.weightMatrix[0][i] = self.weightMatrix[0][i] + learning_rate * hiddenDelta[i]
+					for j in range(0, len(feature)):
+						self.weightMatrix[j+1][i] = self.weightMatrix[j+1][i] + learning_rate * hiddenDelta[i] * feature[j]
 
 				#updating weights for output layer
-				self.weights[0] = self.weights[0] + self.learning_rate * delta
+				self.weights[0] = self.weights[0] + learning_rate * delta
 				for j in range(self.nodes-1):
-					self.weights[j+1] = self.weights[j+1] + self.learning_rate * delta * hiddenActivations[j]
+					self.weights[j+1] = self.weights[j+1] + learning_rate * delta * hiddenActivations[j]
 				index +=1
 
+
+
 class ID3:
-	columns = []
-	attributeData = {}
-	buckets = [0.2,0.4,0.6,0.8,1.0]
-	def prepareData(self):
-		self.columns = dataset.columns.values
-		self.distance_columns = self.columns[2:]
-		normData = normalizeData(dataset, self.columns[2:5])
-		self.test_data, self.training = trainingTestData(normData, 10.0/1500.0)
-		self.test_data, self.test_labels = getNumpy(self.test_data)
-		self.training, self.training_labels = getNumpy(self.training)
+
+	def __init__(self):
+		self.attributeData = {}
+		self.buckets = [0.2, 0.4, 0.6, 0.8, 1.0]
+		self.tree = {}
 		self.attributeData['net_ope_exp'] = self.buckets
 		self.attributeData['net_con'] = self.buckets
 		self.attributeData['tot_loa'] = self.buckets
 		self.attributeData['can_off'] = ['H','P','S']
 		self.attributeData['can_inc_cha_ope_sea'] = ['INCUMBENT', 'CHALLENGER', 'OPEN']
-		self.columns = self.columns[2:-1].tolist()
-		print evaluate(self.predict(self.test_data), self.test_labels)
 
 	def entropy(self, trueValues, total):
-		entropy = -(trueValues/total) * np.log2(trueValues/total) - ((total-trueValues)/total) * np.log2((total-trueValues)/total)
+		if total == 0.0:
+			return 1
+		trueValP = trueValues/float(total)
+		falseValP = (total-trueValues)/float(total)
+		entropy = 0.0
+		if trueValP != 0.0:
+			entropy -= trueValP * math.log(trueValP, 2)
+		if falseValP != 0.0:
+			entropy -= falseValP * math.log(falseValP, 2)
 		return entropy
 
 	def informationGain(self, attribute, examples, labels, presentEntropy):
@@ -319,8 +278,11 @@ class ID3:
 			else:
 				for b in self.buckets:
 					if examples[i][index] <= b:
-						positive,total = valueDict[b]
-						valueDict[b] = (positive + labels[i], total+1)
+						if b in valueDict.keys():
+							positive,total = valueDict[b]
+							valueDict[b] = (positive + labels[i], total+1)
+						else:
+							valueDict[b] = (labels[i], 1)
 						break
 		totalEx = len(examples)
 		informationGain = presentEntropy
@@ -376,15 +338,12 @@ class ID3:
 				tree[pickedAttribute][value] = subtree
 		return tree
 
-	def __init__(self):
-		#Decision tree state here
-		#Feel free to add methods
-		return
-
 	def train(self, features, labels):
-		#training logic here
-		#input is list/array of features and labels
-		return
+		self.columns = features.columns.values.tolist()
+		features = features.values
+		attributes = []
+		attributes.extend(self.columns)
+		self.tree = self.decisionTree(features, attributes, [], labels, [])
 
 	def traversal(self, feature, tree):
 		if type(tree) is int:
@@ -399,24 +358,40 @@ class ID3:
 						if val <= b:
 							return self.traversal(feature, tree[key][b])
 
-
 	def predict(self, features):
 		predictions = []
-		tree = self.decisionTree(self.test_data, self.attributeData.keys(), [], self.test_labels, [])
-		print len(features)
+		features = features.values
 		for feature in features:
-			predictions.append(self.traversal(feature, tree))
+			predictions.append(self.traversal(feature, self.tree))
 		return predictions
 
 if __name__ == "__main__":
-	kNN = KNN()
 	train_dataset, test_dataset = trainingTestData(dataset, 80.0/100.0)
-	train_features, train_labels = preprocessKNN(train_dataset)
+	train_features, train_labels = preprocess(train_dataset)
+	test_features, test_labels = preprocess(test_dataset)
+
+	kNN = KNN()
 	kNN.train(train_features, train_labels)
-	test_features, test_labels = preprocessKNN(test_dataset)
 	predictions = kNN.predict(test_features)
 	accuracy = evaluate(predictions, test_labels)
-	print accuracy
-	# print "Perceptron", Perceptron()
-	# print "MLP", MLP()
-	# ID3().prepareData()
+	print "knn", accuracy
+
+	perceptron = Perceptron()
+	perceptron.train(train_features, train_labels)
+	predictions = perceptron.predict(test_features)
+	accuracy = evaluate(predictions, test_labels)
+	print "perceptron", accuracy
+
+	mlp = MLP()
+	mlp.train(train_features, train_labels)
+	predictions = mlp.predict(test_features)
+	accuracy = evaluate(predictions, test_labels)
+	print "mlp", accuracy
+
+	id3 = ID3()
+	train_features, train_labels = preprocessID3(train_dataset)
+	test_features, test_labels = preprocessID3(test_dataset)
+	id3.train(train_features, train_labels)
+	predictions = id3.predict(test_features)
+	accuracy = evaluate(predictions, test_labels)
+	print "id3", accuracy
