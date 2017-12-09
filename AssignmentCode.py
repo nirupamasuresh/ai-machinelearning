@@ -1,6 +1,5 @@
 import pandas as pd 
 import numpy as np
-import math
 #Data with features and target values
 #Tutorial for Pandas is here - https://pandas.pydata.org/pandas-docs/stable/tutorials.html
 #Helper functions are provided so you shouldn't need to learn Pandas
@@ -212,12 +211,13 @@ class MLP:
 		learning_rate = 0.01
 		self.weights = np.random.uniform(low=-0.1, high=0.1, size=self.nodes+1)
 		self.weightMatrix = np.random.uniform(-0.1,0.1,(len(features[0])+1, self.nodes))
-		while (l<50 and rms != 0.0):
+		while (l<100 and rms != 0.0):
 			l += 1
 			predictions = []
 			index = 0
 			for feature in features:
 				hiddenActivations, outputActivation = self.computeActivations(feature)
+				predictions.append(outputActivation)
 				delta = self.partialDerivative(outputActivation) * (labels[index] - outputActivation)
 				hiddenDelta = []
 				#backpropagation for the hidden layer
@@ -236,6 +236,7 @@ class MLP:
 				for j in range(self.nodes-1):
 					self.weights[j+1] = self.weights[j+1] + learning_rate * delta * hiddenActivations[j]
 				index +=1
+			rms = np.sqrt(((predictions - labels) ** 2).mean())
 
 
 
@@ -258,9 +259,9 @@ class ID3:
 		falseValP = (total-trueValues)/float(total)
 		entropy = 0.0
 		if trueValP != 0.0:
-			entropy -= trueValP * math.log(trueValP, 2)
+			entropy -= trueValP * np.log2(trueValP)
 		if falseValP != 0.0:
-			entropy -= falseValP * math.log(falseValP, 2)
+			entropy -= falseValP * np.log2(falseValP)
 		return entropy
 
 	def informationGain(self, attribute, examples, labels, presentEntropy):
