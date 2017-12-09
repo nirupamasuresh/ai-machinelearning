@@ -58,34 +58,32 @@ def evaluate(solutions, real):
 	return (predictions == labels).sum() / float(labels.size)
 
 #===========================================================================================================
+def preprocessKNN(dataset):
+	columns = dataset.columns.values
+	encodedData = encodeData(dataset, columns[5:-1])
+	normdata = normalizeData(encodedData, columns[2:5])
+	return getNumpy(normdata)
 
 class KNN:
-	columns = []
 	training = []
-	test_data = []
-	test_labels = []
 	training_labels = []
 
 	def __init__(self):
-		self.columns = dataset.columns.values
-		encodedData = encodeData(dataset,self.columns[5:len(self.columns)-1])
-		self.test_data, self.training = trainingTestData(encodedData, 1.0/100.0)
-		self.test_data, self.test_labels = getNumpy(self.test_data)
-		self.training, self.training_labels = getNumpy(self.training)
-		predictions = self.predict(self.test_data, 20)
-		print evaluate(predictions, self.test_labels)
+		return
 
 	def euclidean_distance(self, row1, row2):
 		return np.linalg.norm(row2 - row1)
 
-	def getNeighbors(self, testRow, k):
+	def getNeighbors(self, testRow):
+		k = 20
 		distances = []
-		for i in range(len(self.training)):
-			self.training[i][-1] = self.training_labels[i]
-			distances.append((self.training[i], self.euclidean_distance(testRow, self.training[i])))
+		for i in range(0, len(self.training)):
+			labeledTrain = self.training[i].tolist()
+			labeledTrain.append(self.training_labels[i])
+			distances.append((labeledTrain, self.euclidean_distance(testRow, self.training[i])))
 		distances.sort(key=lambda x:x[1])
 		neighbors = []
-		for i in range(k):
+		for i in range(0, k):
 			neighbors.append(distances[i][0])
 		return neighbors
 
@@ -106,14 +104,13 @@ class KNN:
 		return actual_response
 
 	def train(self, features, labels):
-		#training logic here
-		#input is list/array of features and labels
-		return
+		self.training = features
+		self.training_labels = labels
 
-	def predict(self, features, k):
+	def predict(self, features):
 		predictions = []
 		for i in range(len(features)):
-			neighbors = self.getNeighbors(features[i], k)
+			neighbors = self.getNeighbors(features[i])
 			result = self.getLabel(neighbors)
 			predictions.append(result)
 		return predictions
@@ -412,7 +409,14 @@ class ID3:
 		return predictions
 
 if __name__ == "__main__":
-	# print "KNN" , KNN()
+	kNN = KNN()
+	train_dataset, test_dataset = trainingTestData(dataset, 80.0/100.0)
+	train_features, train_labels = preprocessKNN(train_dataset)
+	kNN.train(train_features, train_labels)
+	test_features, test_labels = preprocessKNN(test_dataset)
+	predictions = kNN.predict(test_features)
+	accuracy = evaluate(predictions, test_labels)
+	print accuracy
 	# print "Perceptron", Perceptron()
 	# print "MLP", MLP()
-	ID3().prepareData()
+	# ID3().prepareData()
