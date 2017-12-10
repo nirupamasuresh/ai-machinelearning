@@ -12,11 +12,11 @@ dataset = pd.read_csv("data.csv")
 #categories: list of columns to normalize, e.g. ["column A", "column C"]
 #Return: full dataset with normalized values
 def normalizeData(dataset, categories):
-    normData = dataset.copy()
-    col = dataset[categories]
-    col_norm = (col - col.min()) / (col.max() - col.min())
-    normData[categories] = col_norm
-    return normData
+	normData = dataset.copy()
+	col = dataset[categories]
+	col_norm = (col - col.min()) / (col.max() - col.min())
+	normData[categories] = col_norm
+	return normData
 
 #Encode categorical values as mutliple columns (One Hot Encoding)
 #dataset: Pandas dataframe
@@ -58,12 +58,14 @@ def evaluate(solutions, real):
 	return (predictions == labels).sum() / float(labels.size)
 
 #===========================================================================================================
+#Preprocess step for KNN, Perceptrons and Multilayer Perceptron
 def preprocess(dataset):
 	columns = dataset.columns.values
 	encodedData = encodeData(dataset, columns[5:-1])
 	normdata = normalizeData(encodedData, columns[2:5])
 	return getNumpy(normdata)
 
+#preprocess step for decision tree
 def preprocessID3(dataset):
 	columns = dataset.columns.values
 	normdata = normalizeData(dataset, columns[2:5])
@@ -131,11 +133,9 @@ class Perceptron:
 
 	def train(self, features, labels):
 		self.weights = np.random.uniform(-0.1,0.1,len(features[0]) + 1)
-		rms = 1.0
 		learning_rate = 0.01
-		l = -1
-		while (l<300 and rms != 0.0):
-			l+=1
+		oneMinute = pd.datetime.now() + pd.Timedelta('1 min')
+		while pd.datetime.now() < oneMinute:
 			predictions = []
 			index = 0
 			for feature in features:
@@ -145,10 +145,14 @@ class Perceptron:
 				index +=1
 				#update bias
 				self.weights[0] = self.weights[0] + learning_rate * error
+				#update weights
 				for j in range(0, len(feature)):
 					self.weights[j+1] = self.weights[j+1] + learning_rate * error * feature[j]
 			rms = np.sqrt(((predictions - labels) ** 2).mean())
+			if rms <= 0.25:
+				break
 
+	#step function
 	def predictForOne(self, feature):
 		activation = self.weights[0]
 		for i in range(0, len(feature)):
@@ -206,39 +210,52 @@ class MLP:
 		return hiddenActivations, outputActivation
 
 	def train(self, features, labels):
-		rms = 1.0
-		l = -1
 		learning_rate = 0.01
+		#assigning random weights
 		self.weights = np.random.uniform(low=-0.1, high=0.1, size=self.nodes+1)
 		self.weightMatrix = np.random.uniform(-0.1,0.1,(len(features[0])+1, self.nodes))
-		while (l<100 and rms != 0.0):
-			l += 1
+		oneMinute = pd.datetime.now() + pd.Timedelta('1 min')
+		while pd.datetime.now() < oneMinute:
+			accHidden = np.zeros((len(features[0])+1, self.nodes))
+			accOut = np.zeros(self.nodes+1)
 			predictions = []
 			index = 0
 			for feature in features:
 				hiddenActivations, outputActivation = self.computeActivations(feature)
 				predictions.append(outputActivation)
+				#delta for the output layer
 				delta = self.partialDerivative(outputActivation) * (labels[index] - outputActivation)
 				hiddenDelta = []
-				#backpropagation for the hidden layer
+				#computing delta for the hidden layer
 				for i in range(0, self.nodes):
 					d = self.partialDerivative(hiddenActivations[i]) * self.weights[i] * delta
 					hiddenDelta.append(d)
 
-				#updating weight matrix for hidden layer
+				#accumulating deltas for hidden layer
 				for i in range(0,self.nodes):
-					self.weightMatrix[0][i] = self.weightMatrix[0][i] + learning_rate * hiddenDelta[i]
+					accHidden[0][i] += learning_rate * hiddenDelta[i]
 					for j in range(0, len(feature)):
-						self.weightMatrix[j+1][i] = self.weightMatrix[j+1][i] + learning_rate * hiddenDelta[i] * feature[j]
+						accHidden[j+1][i] += learning_rate * hiddenDelta[i] * feature[j]
 
-				#updating weights for output layer
-				self.weights[0] = self.weights[0] + learning_rate * delta
-				for j in range(self.nodes-1):
-					self.weights[j+1] = self.weights[j+1] + learning_rate * delta * hiddenActivations[j]
+				#accumulating deltas for output layer
+				accOut[0] += learning_rate * delta
+				for j in range(0, self.nodes):
+					accOut[j+1] += learning_rate * delta * hiddenActivations[j]
 				index +=1
+
 			rms = np.sqrt(((predictions - labels) ** 2).mean())
+			if rms <= 0.2:
+				break
+			#updating weights for input to hidden layer
+			for i in range(0, self.nodes):
+				self.weightMatrix[0][i] += accHidden[0][i]
+				for j in range(0, len(features[0])):
+					self.weightMatrix[j + 1][i] += accHidden[j+1][i]
 
-
+			# updating weights for hidden to output layer
+			self.weights[0] += accOut[0]
+			for j in range(0, self.nodes):
+				self.weights[j+1] += accOut[j+1]
 
 class ID3:
 
@@ -255,28 +272,35 @@ class ID3:
 	def entropy(self, trueValues, total):
 		if total == 0.0:
 			return 1
+		#computing probability of true value
 		trueValP = trueValues/float(total)
+		#computing probability of false value
 		falseValP = (total-trueValues)/float(total)
 		entropy = 0.0
+		#checks added to avoid log2 divide by zero error
 		if trueValP != 0.0:
 			entropy -= trueValP * np.log2(trueValP)
 		if falseValP != 0.0:
 			entropy -= falseValP * np.log2(falseValP)
 		return entropy
 
+	#Returns the information gain of a given attribute
 	def informationGain(self, attribute, examples, labels, presentEntropy):
 		gain = 0.0
 		selectedAttribute = None
 		attributeValues = self.attributeData[attribute]
 		valueDict = {}
 		index = self.columns.index(attribute)
+		#initializing all the attribute values to zero positives and zero total
 		for value in attributeValues:
 			valueDict[value] = (0,0)
 		for i in range(0, len(examples)):
+			#if the attribute value is not a normalized value
 			if examples[i][index] in valueDict.keys():
 				positive,total = valueDict[examples[i][index]]
 				valueDict[examples[i][index]] = (positive + labels[i], total+1)
 			else:
+				#if the attribute value is a normalized value
 				for b in self.buckets:
 					if examples[i][index] <= b:
 						if b in valueDict.keys():
@@ -287,28 +311,32 @@ class ID3:
 						break
 		totalEx = len(examples)
 		informationGain = presentEntropy
-
+		#caluclate information gain for the attribute
 		for value in attributeValues:
 			p,t = valueDict[value]
 			if t > 0:
 				informationGain -= (t/totalEx) * self.entropy(p,t)
 		return informationGain
 
+	#Returns the most common label amongst given labels
 	def mostCommonLabel(self, labels):
 		sum = np.sum(labels)
 		if sum > (len(labels) - sum):
 			return 1
 		return 0
 
+	#Filters the example according to a chosed attribute and its value
 	def filterExamples(self, examples, attribute, attributeValue, labels):
 		newExamples = []
 		newLabels = []
 		index = self.columns.index(attribute)
 		for i in range(0,len(examples)):
+			#if attribute is not a normalized attribute
 			if examples[i][index] == attributeValue:
 				newExamples.append(examples[i])
 				newLabels.append(labels[i])
 			else:
+				#if it is a normalized attribute
 				for b in self.buckets:
 					if examples[i][index] <= b:
 						newExamples.append(examples[i])
@@ -316,26 +344,44 @@ class ID3:
 						break
 		return newExamples, newLabels
 
-	def decisionTree(self, examples, attributes, parent_examples, labels, parent_labels):
+	#Computes the decision tree for given examples, attributes and their lables
+	def decisionTree(self, examples, attributes, labels, parent_labels):
+
+		#if there are no more examples left, return the most common label amongst the parent labels
 		if len(examples) == 0:
 			return self.mostCommonLabel(parent_labels)
+
+		#if the entropy of these examples is 0 (it is certain), return that label
 		elif self.entropy(np.sum(labels), len(labels)) == 0:
 			return labels[0]
+
+		#if there are no more attributes left, return the most common label
 		elif len(attributes) == 0:
 			return self.mostCommonLabel(labels)
+
 		else:
 			infoGain = 0.0
-			pickedAttribute = attributes[0]
+			pickedAttribute = None
+
+			#pick the best attribute with the maximum information gain
 			for attribute in attributes:
 				gain = self.informationGain(attribute, examples, labels, self.entropy(np.sum(labels), len(labels)))
 				if gain > infoGain:
 					infoGain = gain
 					pickedAttribute = attribute
+
+			#create a new tree with the best attribute
 			tree = {pickedAttribute:{}}
+
+			#remove the best attribute from the attribute list
 			attributes.remove(pickedAttribute)
+
 			for value in self.attributeData[pickedAttribute]:
+				#filter examples according to the selected attribute and its value
 				subExamples, subLabels = self.filterExamples(examples, pickedAttribute, value, labels)
-				subtree = self.decisionTree(subExamples, attributes, examples, subLabels, parent_labels)
+				#create a subtree with the remaining attributes
+				subtree = self.decisionTree(subExamples, attributes, subLabels, parent_labels)
+				#add a branch from the attribute value to the new subtree
 				tree[pickedAttribute][value] = subtree
 		return tree
 
@@ -344,9 +390,11 @@ class ID3:
 		features = features.values
 		attributes = []
 		attributes.extend(self.columns)
-		self.tree = self.decisionTree(features, attributes, [], labels, [])
+		self.tree = self.decisionTree(features, attributes, labels, [])
 
+	#Traverses through the tree to find the right label for the feature
 	def traversal(self, feature, tree):
+		#if the tree is a label
 		if type(tree) is int:
 			return tree
 		for key in tree.keys():
